@@ -4,7 +4,7 @@ interface TemperatureProps {
 
 /**
  * Numeric component that displays the temperature value.
- * 
+ *
  * @param {number} props.temp - The temperature value to be displayed.
  * @returns {JSX.Element} The rendered Numeric component.
  */
@@ -19,7 +19,7 @@ function Numeric({ temp }: TemperatureProps) {
 
   return (
     <div className="text-foreground text-4xl font-bold">
-      {`${temp}°C`}
+      {`${temp.toFixed(3)}°C`}
     </div>
   );
 }
