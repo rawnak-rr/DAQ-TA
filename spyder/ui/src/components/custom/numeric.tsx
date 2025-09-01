@@ -18,9 +18,7 @@ function Numeric({ temp }: TemperatureProps) {
   // Justify your choice of implementation in brainstorming.md
 
   return (
-    <div className="text-foreground text-4xl font-bold">
-      {`${temp.toFixed(3)}°C`}
-    </div>
+    <div className="text-foreground text-4xl font-bold">{`${temp}°C`}</div>
   );
 }
 

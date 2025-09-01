@@ -21,6 +21,7 @@ tcpServer.on("connection", (socket) => {
     try {
       const data = JSON.parse(message);
       if (isValidData(data)) {
+        safeTemp(data);
         websocketServer.clients.forEach(function each(client) {
           if (client.readyState === WebSocket.OPEN) {
             client.send(message);
@@ -67,15 +68,8 @@ function isValidData(data: any): data is VehicleData {
   if (typeof temp === "string") {
     const testTemp = parseFloat(temp);
     if (isNaN(testTemp)) return false;
-    if (testTemp > 80 || testTemp < 20) {
-      return false;
-    }
   } else if (typeof temp === "number") {
     if (isNaN(temp) || !isFinite(temp)) return false;
-
-    if (temp > 80 || temp < 20) return false;
-  } else {
-    return false;
   }
 
   // checking time
@@ -85,4 +79,38 @@ function isValidData(data: any): data is VehicleData {
   if (isNaN(time) || !isFinite(time)) return false;
 
   return true;
+}
+
+let unsafeTemp = 0;
+let firstUnsafe: number | null = null;
+
+function safeTemp(data: VehicleData): void {
+  let temp: number;
+
+  if (typeof data.battery_temperature === "string") {
+    temp = parseFloat(data.battery_temperature);
+  } else {
+    temp = data.battery_temperature;
+  }
+
+  const currTime = Date.now();
+  if (temp > 80 || temp < 20) {
+    if (firstUnsafe == null || currTime - firstUnsafe > 5000) {
+      unsafeTemp = 1;
+      firstUnsafe = currTime;
+    } else {
+      unsafeTemp++;
+    }
+
+    console.log(`Unsafe temp: ${temp} C `);
+
+    if (unsafeTemp >= 3) {
+      console.error(`SHUT DOWN THE BATTERY`);
+      unsafeTemp = 0;
+      firstUnsafe = null;
+    }
+  } else {
+    unsafeTemp = 0;
+    firstUnsafe = null;
+  }
 }

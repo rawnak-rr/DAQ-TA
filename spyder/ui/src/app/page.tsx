@@ -10,6 +10,7 @@ import { Thermometer } from "lucide-react";
 import Numeric from "../components/custom/numeric";
 import RedbackLogoDarkMode from "../../public/logo-darkmode.svg";
 import RedbackLogoLightMode from "../../public/logo-lightmode.svg";
+import { read } from "fs";
 
 const WS_URL = "ws://localhost:8080";
 
@@ -58,7 +59,7 @@ export default function Page(): JSX.Element {
         setConnectionStatus("Disconnected");
         break;
     }
-  }, []);
+  }, [readyState]);
 
   /**
    * Effect hook to handle incoming WebSocket messages.
