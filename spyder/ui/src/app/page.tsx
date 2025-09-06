@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Clock,
   Zap,
+  Terminal,
 } from "lucide-react";
 import {
   ChartContainer,
@@ -27,6 +28,8 @@ import {
   Line,
   Area,
   AreaChart,
+  BarChart,
+  Bar,
   ResponsiveContainer,
   XAxis,
   YAxis,
@@ -71,11 +74,8 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 /**
- * F1-Style Telemetry Dashboard for DAQ Technical Assessment
- * Real-time battery temperature monitoring with comprehensive data visualization
- *
- * @returns {JSX.Element} The rendered telemetry dashboard
- */
+  @returns {JSX.Element} 
+ **/
 export default function Page(): JSX.Element {
   const { setTheme } = useTheme();
   const [temperature, setTemperature] = useState<number>(0);
@@ -92,6 +92,44 @@ export default function Page(): JSX.Element {
     uptime: 0,
   });
   const [startTime] = useState(Date.now());
+  const [temperatureAlerts, setTemperatureAlerts] = useState<string[]>([]);
+
+  const addTemperatureAlert = useCallback(
+    (temp: number, status: "warning" | "danger") => {
+      const timestamp = new Date().toLocaleTimeString();
+      let alertMsg = "";
+      // simplified alert messages
+      if (status === "danger") {
+        if (temp < 20) {
+          alertMsg = `[${timestamp}] CRITICAL: Temperature too low (${temp.toFixed(
+            1
+          )}°C)`;
+        } else if (temp > 80) {
+          alertMsg = `[${timestamp}] CRITICAL: Temperature too high (${temp.toFixed(
+            1
+          )}°C)`;
+        }
+      } else if (status === "warning") {
+        if (temp < 25) {
+          alertMsg = `[${timestamp}] WARNING: Temperature approaching lower limit (${temp.toFixed(
+            1
+          )}°C)`;
+        } else if (temp > 75) {
+          alertMsg = `[${timestamp}] WARNING: Temperature approaching upper limit (${temp.toFixed(
+            1
+          )}°C)`;
+        }
+      }
+
+      if (alertMsg) {
+        setTemperatureAlerts((prev) => {
+          const updated = [...prev, alertMsg];
+          return updated.slice(-10);
+        });
+      }
+    },
+    []
+  );
 
   const {
     lastJsonMessage,
@@ -104,9 +142,8 @@ export default function Page(): JSX.Element {
 
   const getTemperatureStatus = useCallback(
     (temp: number): "safe" | "warning" | "danger" => {
-      // Handle NaN or invalid values
       if (typeof temp !== "number" || isNaN(temp) || !isFinite(temp)) {
-        return "danger"; // Treat invalid values as dangerous
+        return "danger";
       }
 
       if (temp < 20 || temp > 80) return "danger";
@@ -115,6 +152,26 @@ export default function Page(): JSX.Element {
     },
     []
   );
+
+  const getHistogramData = useCallback(() => {
+    const bins: { [key: string]: number } = {};
+    const binSize = 5; // 5°C bins
+
+    temperatureHistory.forEach((reading) => {
+      const temp = reading.temperature;
+      const binStart = Math.floor(temp / binSize) * binSize;
+      const binLabel = `${binStart}-${binStart + binSize}°C`;
+      bins[binLabel] = (bins[binLabel] || 0) + 1;
+    });
+
+    return Object.entries(bins)
+      .map(([range, count]) => ({ range, count }))
+      .sort((a, b) => {
+        const aStart = parseInt(a.range.split("-")[0]);
+        const bStart = parseInt(b.range.split("-")[0]);
+        return aStart - bStart;
+      });
+  }, [temperatureHistory]);
 
   const updateStats = useCallback(
     (newTemp: number, history: TemperatureReading[]) => {
@@ -125,14 +182,13 @@ export default function Page(): JSX.Element {
         );
 
       if (temps.length === 0) {
-        return; // No valid temperatures to calculate stats
+        return;
       }
 
       const minTemp = Math.min(...temps);
       const maxTemp = Math.max(...temps);
       const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
 
-      // Only update stats if calculations are valid
       if (
         !isNaN(minTemp) &&
         !isNaN(maxTemp) &&
@@ -188,31 +244,38 @@ export default function Page(): JSX.Element {
 
     const newTemp = lastJsonMessage.battery_temperature;
 
-    // Validate temperature to prevent NaN values
+    // validating temperature to prevent NaN values
     if (typeof newTemp !== "number" || isNaN(newTemp) || !isFinite(newTemp)) {
-      console.warn("Invalid temperature received, skipping:", newTemp);
+      console.warn(`Invalid temperature received: ${newTemp}`);
       return;
     }
 
     const now = new Date();
     const timeString = now.toLocaleTimeString();
+    const status = getTemperatureStatus(newTemp);
+
+    if (status === "danger") {
+      addTemperatureAlert(newTemp, "danger");
+    } else if (status === "warning") {
+      addTemperatureAlert(newTemp, "warning");
+    }
 
     const newReading: TemperatureReading = {
       time: timeString,
       temperature: newTemp,
       timestamp: lastJsonMessage.timestamp,
-      status: getTemperatureStatus(newTemp),
+      status: status,
     };
 
     setTemperature(newTemp);
     setTemperatureHistory((prev) => {
       const updated = [...prev, newReading];
-      // Keep only last 50 readings for performance
+      //last 50 readings for performance
       const trimmed = updated.slice(-50);
       updateStats(newTemp, prev);
       return trimmed;
     });
-  }, [lastJsonMessage, getTemperatureStatus, updateStats]);
+  }, [lastJsonMessage, getTemperatureStatus, updateStats, addTemperatureAlert]);
 
   /**
    * Effect hook to set the theme to dark mode.
@@ -222,22 +285,20 @@ export default function Page(): JSX.Element {
   }, [setTheme]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen font-mono bg-background">
       {/* Header */}
       <header className="px-6 py-4 border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="flex items-center gap-6">
           <Image
             src={RedbackLogoDarkMode}
-            className="h-12 w-auto"
+            className="h-11 w-auto"
             alt="Redback Racing Logo"
           />
           <div className="flex flex-col">
             <h1 className="text-foreground text-2xl font-bold">
               REDBACK RACING
             </h1>
-            <p className="text-muted-foreground text-sm">
-              DAQ Telemetry System
-            </p>
+            <p className="text-muted-foreground text-sm">Telemetry System</p>
           </div>
           <div className="ml-auto flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -252,7 +313,6 @@ export default function Page(): JSX.Element {
                 connectionStatus === "Connected" ? "success" : "destructive"
               }
               className="px-3 py-1">
-              <Activity className="h-3 w-3 mr-1" />
               {connectionStatus}
             </Badge>
           </div>
@@ -262,43 +322,27 @@ export default function Page(): JSX.Element {
       {/* Main Dashboard */}
       <div className="p-6 space-y-6">
         {/* Primary Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Current Temperature - Large Display */}
-          <Card className="col-span-1 md:col-span-2 bg-gradient-to-br from-card to-card/50">
+        <div className="grid grid-cols-4 gap-6">
+          <Card className="bg-gradient-to-br from-card to-card/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-xl flex items-center gap-3">
-                <Thermometer className="h-6 w-6 text-chart-1" />
+                <Thermometer className="h-5 w-auto text-white" />
                 Battery Temperature
-                <Badge
-                  variant={
-                    getTemperatureStatus(temperature) === "safe"
-                      ? "success"
-                      : getTemperatureStatus(temperature) === "warning"
-                      ? "secondary"
-                      : "destructive"
-                  }
-                  className="ml-auto">
-                  {getTemperatureStatus(temperature).toUpperCase()}
-                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
                 <Numeric temp={temperature} />
               </div>
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Safe Range: 25°C - 75°C</span>
-                <span>Critical: &lt;20°C or &gt;80°C</span>
-              </div>
             </CardContent>
           </Card>
 
           {/* Temperature Stats */}
-          <Card className="bg-gradient-to-br from-chart-2/10 to-chart-2/5">
+          <Card className="from-chart-2/10 to-chart-2/5">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-xl flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-chart-2" />
-                Statistics
+                Range
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -326,7 +370,7 @@ export default function Page(): JSX.Element {
           </Card>
 
           {/* Alert Status */}
-          <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5">
+          <Card className="from-destructive/10 to-destructive/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -339,6 +383,37 @@ export default function Page(): JSX.Element {
                   {stats.alertCount}
                 </div>
                 <p className="text-sm text-muted-foreground">Total Warnings</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Terminal className="h-5 w-5 text-orange-500" />
+                Console
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {temperatureAlerts.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    No temperature alerts
+                  </div>
+                ) : (
+                  temperatureAlerts
+                    .slice(-5)
+                    .map((alert: string, index: number) => (
+                      <div
+                        key={index}
+                        className={`text-xs font-mono p-2 rounded border-l-2 ${
+                          alert.includes("CRITICAL")
+                            ? "text-red-400 bg-red-950/20 border-red-500"
+                            : "text-orange-400 bg-orange-950/20 border-orange-500"
+                        }`}>
+                        {alert}
+                      </div>
+                    ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -410,82 +485,53 @@ export default function Page(): JSX.Element {
           </Card>
 
           {/* Temperature Distribution */}
-          <Card className="bg-gradient-to-br from-card to-card/50">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Gauge className="h-5 w-5 text-chart-2" />
-                Temperature Zones
+                Temperature Distribution
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ChartContainer
                 config={chartConfig}
                 className="h-[300px]">
-                <AreaChart data={temperatureHistory}>
+                <BarChart data={getHistogramData()}>
                   <CartesianGrid
                     strokeDasharray="3 3"
                     stroke="hsl(var(--border))"
                   />
                   <XAxis
-                    dataKey="time"
+                    dataKey="range"
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickLine={false}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
                   />
                   <YAxis
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={12}
                     tickLine={false}
-                    domain={[0, 100]}
+                    label={{
+                      value: "Count",
+                      angle: -90,
+                      position: "insideLeft",
+                    }}
                   />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <defs>
-                    <linearGradient
-                      id="temperatureGradient"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1">
-                      <stop
-                        offset="0%"
-                        stopColor="hsl(var(--chart-1))"
-                        stopOpacity={0.8}
-                      />
-                      <stop
-                        offset="100%"
-                        stopColor="hsl(var(--chart-1))"
-                        stopOpacity={0.1}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <Area
-                    type="monotone"
-                    dataKey="temperature"
-                    stroke="hsl(var(--chart-1))"
-                    fill="url(#temperatureGradient)"
-                    strokeWidth={2}
+                  <ChartTooltip
+                    content={<ChartTooltipContent />}
+                    labelFormatter={(label) => `Temperature Range: ${label}`}
                   />
-                  <ReferenceLine
-                    y={20}
-                    stroke="hsl(var(--destructive))"
-                    strokeDasharray="5 5"
+                  <Bar
+                    dataKey="count"
+                    fill="hsl(var(--chart-2))"
+                    stroke="hsl(var(--chart-2))"
+                    strokeWidth={1}
+                    radius={[4, 4, 0, 0]}
                   />
-                  <ReferenceLine
-                    y={25}
-                    stroke="hsl(var(--chart-4))"
-                    strokeDasharray="5 5"
-                  />
-                  <ReferenceLine
-                    y={75}
-                    stroke="hsl(var(--chart-4))"
-                    strokeDasharray="5 5"
-                  />
-                  <ReferenceLine
-                    y={80}
-                    stroke="hsl(var(--destructive))"
-                    strokeDasharray="5 5"
-                  />
-                </AreaChart>
+                </BarChart>
               </ChartContainer>
             </CardContent>
           </Card>
@@ -493,7 +539,7 @@ export default function Page(): JSX.Element {
 
         {/* System Information */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-success/10 to-success/5">
+          <Card className="from-success/10 to-success/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Battery className="h-5 w-5 text-success" />
@@ -527,7 +573,7 @@ export default function Page(): JSX.Element {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-chart-3/10 to-chart-3/5">
+          <Card className="from-chart-3/10 to-chart-3/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="h-5 w-5 text-chart-3" />
@@ -552,7 +598,7 @@ export default function Page(): JSX.Element {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+          <Card className="from-primary/10 to-primary/5">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-5 w-5 text-primary" />

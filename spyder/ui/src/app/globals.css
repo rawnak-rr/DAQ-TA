@@ -1,19 +1,24 @@
+@import url("https://fonts.googleapis.com/css2?family=Red+Hat+Mono:wght@400;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
+  font-family: "Red Hat Mono", monospace;
+}
+
+body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    "Red Hat Mono" sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: black;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
 
@@ -72,13 +77,12 @@ code {
     --input: 0 0% 14.9%;
     --ring: 0 72.2% 50.6%;
     --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
+    --chart-2: 1 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
 }
-
 
 @layer base {
   * {
@@ -88,4 +92,3 @@ code {
     @apply bg-background text-foreground;
   }
 }
-
