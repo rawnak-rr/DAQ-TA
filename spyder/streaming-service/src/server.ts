@@ -32,7 +32,7 @@ tcpServer.on("connection", (socket) => {
         console.log("bad data");
       }
     } catch (error) {
-      console.log("Failed to parse JSON");
+      console.log("failed to parse JSON");
     }
   });
 
@@ -102,7 +102,7 @@ function safeTemp(data: VehicleData): void {
       unsafeTemp++;
     }
 
-    console.log(`Unsafe temp: ${temp} C `);
+    console.log(`Unsafe temp: ${temp} C  at ${currTime}`);
 
     if (unsafeTemp >= 3) {
       console.error(`SHUT DOWN THE BATTERY`);
